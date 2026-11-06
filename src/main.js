@@ -383,7 +383,7 @@ function shoot() {
     .addScaledVector(up, 2 + Math.random() * 0.8)
     .addScaledVector(forward, -0.4)
     .add(new THREE.Vector3(player.vx, player.vy, player.vz));
-  effects.ejectCase(gunPointToWorld(viewmodel.portPoint()), caseVelocity);
+  effects.ejectCase(gunPointToWorld(viewmodel.portPoint()), caseVelocity, gun.caseSize);
 
   const k = (1 - (1 - RECOIL.aimed) * aimAmount) * gun.recoil;
   viewKick.vx += (RECOIL.kick + Math.random() * RECOIL.kickRandom) * k;
@@ -458,6 +458,12 @@ function updateBeams() {
 }
 
 // --- Ammo counter ---
+
+// The guns' names on the page (the start screen's controls and credits) are
+// each gun's own (its name in src/shared/config.js).
+for (const el of document.querySelectorAll('[data-gun-name]')) {
+  if (GUNS[el.dataset.gunName]) el.textContent = GUNS[el.dataset.gunName].name;
+}
 
 const ammo = document.getElementById('ammo');
 const ammoName = ammo.querySelector('.name');
@@ -554,7 +560,7 @@ renderer.setAnimationLoop((time) => {
     viewmodel.flickSwitch();
   }
 
-  // Switching guns: 1, 2 and 3, or the mouse wheel.
+  // Switching guns: 1 to 4, or the mouse wheel.
   if (play) {
     LOADOUT.forEach((key, i) => {
       if (input.presses(`Digit${i + 1}`) > 0) switchGun(key);
