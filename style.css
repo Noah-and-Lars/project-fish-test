@@ -1,0 +1,367 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #fff;
+  user-select: none;
+}
+
+#game canvas {
+  display: block;
+}
+
+/* Small dot in the middle of the screen. */
+#crosshair {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+body:not(.playing) #crosshair {
+  display: none;
+}
+
+/* Aiming down the sights: the sights take over from the dot. */
+#crosshair {
+  transition: opacity 0.12s;
+}
+
+body.aiming #crosshair,
+body.sprinting #crosshair {
+  opacity: 0;
+}
+
+/* Ammo counter, bottom right: rounds in the magazine, then the reserve. */
+#ammo {
+  position: fixed;
+  right: 28px;
+  bottom: 22px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 600 16px/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+/* The gun's name, small, before the count. */
+#ammo .name {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+#ammo .mag {
+  font-size: 40px;
+  font-variant-numeric: tabular-nums;
+}
+
+#ammo .reserve {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+#ammo .reserve::before {
+  content: '/ ';
+}
+
+#ammo .hint {
+  position: absolute;
+  right: 0;
+  bottom: 52px;
+  white-space: nowrap;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+#ammo.low .mag {
+  color: #ff8f7a;
+}
+
+body:not(.playing) #ammo {
+  display: none;
+}
+
+#debug {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  margin: 0;
+  padding: 6px 10px;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: pre;
+}
+
+#debug:empty {
+  display: none;
+}
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  cursor: pointer;
+}
+
+#overlay[hidden] {
+  display: none;
+}
+
+#overlay .panel {
+  text-align: center;
+  padding: 24px 32px;
+}
+
+#overlay h1 {
+  margin: 0 0 8px;
+  font-size: 44px;
+  letter-spacing: 0.04em;
+}
+
+#overlay-status {
+  margin: 0 0 24px;
+  font-size: 18px;
+  opacity: 0.9;
+}
+
+.controls {
+  margin: 0 auto;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.controls td {
+  padding: 3px 10px;
+  text-align: left;
+}
+
+#overlay .credits {
+  margin: 20px 0 0;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+#overlay .credits a {
+  color: inherit;
+}
+
+.controls td:first-child {
+  font-weight: 600;
+  text-align: right;
+  opacity: 0.75;
+}
+
+/* The loadout menu (B): a panel over the game, like the start screen. */
+#loadout {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+#loadout[hidden] {
+  display: none;
+}
+
+#loadout .panel {
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  box-sizing: border-box;
+  padding: 22px 28px;
+  border-radius: 8px;
+  background: rgba(20, 22, 26, 0.92);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+#loadout h2 {
+  margin: 0 0 14px;
+  font-size: 24px;
+  letter-spacing: 0.04em;
+}
+
+#loadout button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 6px 12px;
+  margin: 0 6px 6px 0;
+}
+
+#loadout button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+#loadout button.chosen {
+  border-color: #f2c14e;
+  background: rgba(242, 193, 78, 0.2);
+}
+
+#loadout .tabs {
+  margin-bottom: 14px;
+}
+
+#loadout .slot {
+  margin-bottom: 10px;
+}
+
+#loadout .label {
+  display: inline-block;
+  min-width: 140px;
+  opacity: 0.75;
+  font-weight: 600;
+}
+
+#loadout .about {
+  margin: 0 0 4px;
+  font-size: 13px;
+  opacity: 0.65;
+}
+
+#loadout .none {
+  opacity: 0.7;
+  margin: 6px 0 16px;
+}
+
+#loadout .back {
+  margin-top: 10px;
+}
+
+/* The Outfit tab: the picture of him beside the slots (stacked on a phone). */
+#loadout .panel.wide {
+  width: min(800px, calc(100vw - 32px));
+}
+
+#loadout .slots button {
+  padding: 6px 10px;
+}
+
+#loadout .outfit {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+#loadout .stage {
+  flex: 0 0 240px;
+  text-align: center;
+}
+
+#loadout canvas.avatar {
+  display: block;
+  width: 240px;
+  height: min(340px, calc(100vh - 230px));
+  min-height: 220px;
+  border-radius: 6px;
+  background: radial-gradient(ellipse at 50% 35%, #56606c 0%, #2c3138 70%, #22262b 100%);
+  touch-action: none;
+  cursor: grab;
+}
+
+#loadout canvas.avatar:active {
+  cursor: grabbing;
+}
+
+#loadout .views {
+  margin-top: 8px;
+}
+
+#loadout .views button {
+  padding: 3px 10px;
+  font-size: 13px;
+}
+
+#loadout .stage .hint {
+  margin: 0;
+  font-size: 12px;
+  opacity: 0.55;
+}
+
+#loadout .slots {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+#loadout .slots .label {
+  display: block;
+  min-width: 0;
+  margin-bottom: 6px;
+}
+
+#loadout .slots .slot {
+  margin-bottom: 14px;
+}
+
+@media (max-width: 600px) {
+  #loadout .panel {
+    padding: 16px;
+  }
+
+  #loadout .outfit {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  #loadout .stage {
+    flex: none;
+  }
+
+  #loadout canvas.avatar {
+    width: 100%;
+    height: min(40vh, 320px);
+  }
+}
+
+body.menu-open #crosshair,
+body.menu-open #ammo {
+  display: none;
+}
+
+
+/* Photo mode (P): no crosshair or ammo; a note on the controls. */
+body.photo #crosshair,
+body.photo #ammo {
+  display: none;
+}
+
+#photo-hint {
+  display: none;
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(20, 22, 26, 0.7);
+  color: #fff;
+  font: 13px/1.4 system-ui, sans-serif;
+  text-align: center;
+}
+
+body.photo #photo-hint {
+  display: block;
+}

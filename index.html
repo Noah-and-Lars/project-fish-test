@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Project Fish</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="game"></div>
+    <div id="crosshair"></div>
+    <div id="photo-hint">Photo mode: WASD to fly (Shift faster), Space / C up and down, mouse to look; arrow keys walk him (Shift runs). P to go back.</div>
+    <pre id="debug"></pre>
+    <div id="ammo"><span class="name">PF-9</span><span class="mag">15</span><span class="reserve">60</span><span class="hint"></span></div>
+
+    <div id="loadout" hidden></div>
+
+    <div id="overlay">
+      <div class="panel">
+        <h1>Project Fish</h1>
+        <p id="overlay-status">Loading…</p>
+        <table class="controls">
+          <tr><td>WASD</td><td>Move</td></tr>
+          <tr><td>Mouse</td><td>Look</td></tr>
+          <tr><td>Left mouse</td><td>Fire</td></tr>
+          <tr><td>Right mouse</td><td>Aim down the sights (hold)</td></tr>
+          <tr><td>Q</td><td>Aim: click to toggle, or hold</td></tr>
+          <tr><td>R</td><td>Reload</td></tr>
+          <tr><td>F</td><td>Inspect the gun</td></tr>
+          <tr><td>1 / 2 / 3, mouse wheel</td><td>Switch guns</td></tr>
+          <tr><td>B</td><td>Loadout: the guns' attachments and your outfit</td></tr>
+          <tr><td>Shift</td><td>Sprint (hold; double-tap for a tactical sprint)</td></tr>
+          <tr><td>C</td><td>Crouch; while sprinting, slide (double-tap: onto your back)</td></tr>
+          <tr><td>Z</td><td>Go prone; while sprinting, dive</td></tr>
+          <tr><td>Space</td><td>Jump; at a ledge, climb or vault</td></tr>
+          <tr><td>T</td><td>Light and laser on and off</td></tr>
+          <tr><td>P</td><td>Photo mode: fly round and look at yourself</td></tr>
+          <tr><td>Esc</td><td>Release the mouse</td></tr>
+        </table>
+        <p class="credits">PF-9 and its attachments based on a <a href="https://sketchfab.com/3d-models/pistol-9mm-custom-7bb44ec1d8e14925aeebbfa8374b87cf" target="_blank" rel="noopener" onclick="event.stopPropagation()">model</a> by <a href="https://sketchfab.com/DTry" target="_blank" rel="noopener" onclick="event.stopPropagation()">~D-Try~</a>, <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" onclick="event.stopPropagation()">CC BY 4.0</a>, changed for the game. PF-45 based on a <a href="https://sketchfab.com/3d-models/colt-m1911-2cfbca3cd37a426c8dbf6474504703e8" target="_blank" rel="noopener" onclick="event.stopPropagation()">model</a> by <a href="https://sketchfab.com/neyr" target="_blank" rel="noopener" onclick="event.stopPropagation()">neyr</a>, <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" onclick="event.stopPropagation()">CC BY 4.0</a>, changed for the game. Soldier based on a <a href="https://sketchfab.com/3d-models/soldier-full-tactical-gear-850593a8c7114c188395ba1849a66eb9" target="_blank" rel="noopener" onclick="event.stopPropagation()">model</a> by <a href="https://sketchfab.com/1799danly" target="_blank" rel="noopener" onclick="event.stopPropagation()">DanlyVostok</a>, <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" onclick="event.stopPropagation()">CC BY 4.0</a>, changed for the game. Outfit gear based on models by <a href="https://sketchfab.com/txyrm70" target="_blank" rel="noopener" onclick="event.stopPropagation()">Exactly</a>, <a href="http://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener" onclick="event.stopPropagation()">CC BY 4.0</a>, changed for the game: the <a href="https://sketchfab.com/3d-models/tactical-helmet-with-headset-game-ready-82adf376164f4d99a4e0b2949930e2ad" target="_blank" rel="noopener" onclick="event.stopPropagation()">comms helmet</a>, the <a href="https://sketchfab.com/3d-models/tactical-headset-game-ready-c1cee56e73ed47438015a646ad82dfa5" target="_blank" rel="noopener" onclick="event.stopPropagation()">headset</a>, the <a href="https://sketchfab.com/3d-models/tactical-plate-carrier-vest-game-ready-3b51e6329dbb4b0aa14e43f12eb6c42a" target="_blank" rel="noopener" onclick="event.stopPropagation()">black carrier</a>, the <a href="https://sketchfab.com/3d-models/military-armor-3d-model-7cab57de2b844a60a43af4fd8b61a4a4" target="_blank" rel="noopener" onclick="event.stopPropagation()">olive carrier</a>, and gloves (<a href="https://sketchfab.com/3d-models/tactical-combat-gloves-game-ready-5e8f53fcba864163a199fa22baa653cb" target="_blank" rel="noopener" onclick="event.stopPropagation()">1</a>, <a href="https://sketchfab.com/3d-models/tactical-combat-gloves-3d-model-fda69c63c472449f8ded80a9e6d91562" target="_blank" rel="noopener" onclick="event.stopPropagation()">2</a>, <a href="https://sketchfab.com/3d-models/military-tactical-gloves-multicam-hard-knuckle-72342e418cd743209395bba607d5504e" target="_blank" rel="noopener" onclick="event.stopPropagation()">3</a>).</p>
+      </div>
+    </div>
+
+    <script
+      type="module"
+      src="src/main.js"
+      onerror="document.getElementById('overlay-status').textContent = 'The game couldn’t load. Check your internet connection and refresh.'"
+    ></script>
+  </body>
+</html>
