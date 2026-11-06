@@ -23,7 +23,9 @@
 // (player/fpArms.js), dressed by a Wardrobe too with `slots: ['gloves']`,
 // draw them in the gun layer instead. Each glove file carries how thick its
 // fingers are to his own gloves' (gear.thickness in the node's extras), for
-// fitting the fingers to the gun.
+// fitting the fingers to the gun. The guns that bring their own arms (the
+// Beretta 92FS, the FN 502 and the Hi-Power) wear the same gloves made for
+// their own hands (an option's `guns`), put on by src/viewmodel/gunGloves.js.
 //
 // (They're bound to his hand bones by name: CC_Base_[LR]_Hand, the
 // ForearmTwist02 for the cuff, and three bones for each finger and the
@@ -61,12 +63,22 @@ const EXTRA = {
 };
 
 const gearFile = (name) => new URL(`../assets/gear/${name}.glb`, import.meta.url).href;
+// A pair of gloves made for the arms the Beretta, the FN 502 and the
+// Hi-Power bring with them (tools/gear/gun_gloves.mjs; worn there by
+// src/viewmodel/gunGloves.js), by gun.
+const gunGloves = (id) => Object.fromEntries(['beretta', 'fn502', 'hipistol'].map((gun) => [gun, gearFile(`gloves_${id}_${gun}`)]));
 
 // The slots and their options: { id, name, about, own: true (his own
 // piece) | file (a piece from assets/gear) | neither (nothing), hides
-// (optional: names in EXTRA also left off with it) }. The first option is
-// the one he starts in. (Ids stay as they were saved: the Sage carrier and
-// gloves are 'olive'.)
+// (optional: names in EXTRA also left off with it), guns (gloves only,
+// optional: the same gloves for the guns with their own arms, by gun; an
+// option without them leaves those guns the hands they came with) }. He
+// starts in the slot's `default`, or else its first option. (Ids stay as
+// they were saved: the Sage carrier and gloves are 'olive'.)
+//
+// "No gloves" is his own gloves on him: the soldier model has no bare
+// hands under them. It's for the guns with their own arms, which then keep
+// the hands they came with.
 export const SLOTS = [
   {
     id: 'head', name: 'Head',
@@ -87,12 +99,13 @@ export const SLOTS = [
     ],
   },
   {
-    id: 'gloves', name: 'Gloves',
+    id: 'gloves', name: 'Gloves', default: 'field',
     options: [
-      { id: 'field', name: 'Field gloves', about: 'His own gloves, with a hard knuckle guard.', own: true },
-      { id: 'black', name: 'Black gloves', about: 'Black gloves with a padded knuckle guard, knuckle pads and a wide wrist strap.', file: gearFile('gloves_black') },
-      { id: 'olive', name: 'Sage gloves', about: 'Worn sage-green gloves with moulded knuckles and a long strapped cuff.', file: gearFile('gloves_olive') },
-      { id: 'camo', name: 'Camo gloves', about: 'Camouflage gloves with a hard knuckle guard and a tan leather palm.', file: gearFile('gloves_camo') },
+      { id: 'none', name: 'No gloves', about: "The hands the Beretta, the FN 502 and the Hi-Power came with (bare hands on the Beretta, its own leather gloves on the FN 502, its own black gloves on the Hi-Power). He has no bare hands under his gloves, so he keeps his field gloves on.", own: true },
+      { id: 'field', name: 'Field gloves', about: 'His own gloves, with a hard knuckle guard. (They weren\'t made for the own arms of the Beretta, the FN 502 and the Hi-Power, which keep the hands they came with.)', own: true },
+      { id: 'black', name: 'Black gloves', about: 'Black gloves with a padded knuckle guard, knuckle pads and a wide wrist strap.', file: gearFile('gloves_black'), guns: gunGloves('black') },
+      { id: 'olive', name: 'Sage gloves', about: 'Worn sage-green gloves with moulded knuckles and a long strapped cuff.', file: gearFile('gloves_olive'), guns: gunGloves('olive') },
+      { id: 'camo', name: 'Camo gloves', about: 'Camouflage gloves with a hard knuckle guard and a tan leather palm.', file: gearFile('gloves_camo'), guns: gunGloves('camo') },
     ],
   },
 ];
@@ -114,7 +127,7 @@ export class Outfit {
       // Nothing saved (or storage is off): his own kit.
     }
     for (const slot of SLOTS) {
-      this.chosen[slot.id] = optionOf(slot.id, saved[slot.id]) ? saved[slot.id] : slot.options[0].id;
+      this.chosen[slot.id] = optionOf(slot.id, saved[slot.id]) ? saved[slot.id] : slot.default || slot.options[0].id;
     }
   }
 
@@ -163,8 +176,16 @@ const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
 const files = new Map(); // url -> Promise of the loaded file
 
 // Loads a gear file once (for every copy and the preview).
+// A file that fails to load is forgotten, so the next time it's wanted
+// it's fetched again (after a network blip, say).
 export function loadGear(url) {
-  if (!files.has(url)) files.set(url, loader.loadAsync(url));
+  if (!files.has(url)) {
+    const loading = loader.loadAsync(url);
+    files.set(url, loading);
+    loading.catch(() => {
+      if (files.get(url) === loading) files.delete(url);
+    });
+  }
   return files.get(url);
 }
 
@@ -266,7 +287,10 @@ export class Wardrobe {
       }
       // (Something else was chosen meanwhile.)
       if (copy.pending[slot] !== id) {
-        for (const m of meshes || []) disposeOwnMaterials(m);
+        for (const m of meshes || []) {
+          disposeOwnMaterials(m);
+          m.skeleton.dispose();
+        }
         return;
       }
     }
@@ -275,6 +299,9 @@ export class Wardrobe {
       for (const m of copy.worn[slot].meshes) {
         copy.remove(m);
         disposeOwnMaterials(m);
+        // (Its own skeleton's bone texture; the first-person copy that
+        // shares it went in copy.remove.)
+        m.skeleton.dispose();
       }
     }
     const showOwn = option.own || meshes === null;

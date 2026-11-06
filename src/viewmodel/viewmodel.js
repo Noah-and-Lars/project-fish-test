@@ -13,7 +13,9 @@ import { createPistol45, MODEL45, FALLBACK45 } from './pistol45.js';
 import { MODEL9 } from './pistol9.js';
 import { MODEL_BERETTA } from './beretta.js';
 import { MODEL_FN502 } from './fn502.js';
+import { MODEL_HIPISTOL } from './hipistol.js';
 import { AnimatedGun } from './animatedGun.js';
+import { GunGloves } from './gunGloves.js';
 import { createArms, rightHandPose } from './arms.js';
 import { SupportHand, WRIST, HOLD_TURN, holdingAt, handMatrix, OVER_TURN, OVER_SLIDE } from './supportHand.js';
 import { ShootingHand, MAG_RELEASE } from './shootingHand.js';
@@ -21,7 +23,7 @@ import { ViewmodelMotion, MOTION } from './motion.js';
 import { MuzzleFlash } from '../effects/muzzleFlash.js';
 import { outdoorEnvironment } from '../world.js';
 import { RELOAD_STEPS, CATCH_GAP, magazineFall, INSPECT, INSPECT_STEPS, reloadSteps } from '../weapon.js';
-import { PISTOL, PISTOL45, BERETTA, FN502, LOADOUT } from '../shared/config.js';
+import { PISTOL, PISTOL45, BERETTA, FN502, HIPISTOL, LOADOUT } from '../shared/config.js';
 
 // Points on the built-in first pistol (gun space; used if its model file
 // can't be loaded; the model's are in pistol9.js): the
@@ -54,7 +56,7 @@ const TRIGGER_TRAVEL = 0.0032;
 const INDICATOR_TRAVEL = 0.0006;
 const BLADE_TRAVEL = 0.0009;
 
-// If the Beretta's or the FN 502's model can't be loaded, the PF-9's built-
+// If the model of a gun with its own arms can't be loaded, the PF-9's built-
 // in stand-in takes its place, held by the usual hands: its rules, but the
 // PF-9's reloads and inspect (theirs follow their own animations).
 const standIn = (rules) => ({
@@ -93,6 +95,20 @@ const GUN_KINDS = {
     // the others, its rear sight about where theirs is.)
     rig: { hip: new THREE.Vector3(0.02, -0.03, -0.03), viewFov: 64, kick: 0.4 },
     fallback: createPistol, fallbackPoints: POINTS9, fallbackRules: standIn(FN502),
+  },
+  hipistol: {
+    rules: HIPISTOL, model: new URL('../../assets/hipistol.glb', import.meta.url), animated: MODEL_HIPISTOL,
+    // (Its maker holds it low on the right at the hip, with the support
+    // arm below the view. It's held 1 cm right, 1 cm lower and 2 cm further
+    // out than that, which brings it in to about where the others are; any
+    // higher and the support arm's sleeve comes into view at the bottom
+    // left. Aiming, its own aimed clips play and the gun layer lines up
+    // their sights.)
+    // (Its run clip is its maker's sprint pose, the gun held low across the
+    // chest, so it doesn't take the gun layer's too; that pose is held 7 cm
+    // higher, or the gun would be all but out of view.)
+    rig: { hip: new THREE.Vector3(0.01, -0.01, -0.02), kick: 0.4, sprintPose: 0, sprintOut: new THREE.Vector3(0, 0.07, 0) },
+    fallback: createPistol, fallbackPoints: POINTS9, fallbackRules: standIn(HIPISTOL),
   },
 };
 
@@ -638,6 +654,11 @@ const HIP_QUATERNION = new THREE.Quaternion().setFromEuler(HIP_ROTATION);
 //   animation already kicks the hands and gun back and up).
 // - tacOut: on a tactical sprint, as the others come up close in front of
 //   the chest, it's held this much lower (metres, gun space).
+// - sprintPose: how much of the gun layer's sprint pose (MOTION.sprint and
+//   tacSprint's offsets) it takes: 0 for a gun whose run clip is its
+//   maker's own sprint pose. sprintOut: sprinting, it's held this much
+//   higher (metres, gun space), as much as it's in the sprint pose: for a
+//   run clip that takes the gun lower than the gun layer's view shows.
 // (Sprinting, the others' hands bend at the wrists; a gun with its own arms
 // only does if its model asks for it, see animatedGun.js: the whole rig
 // takes the sprint pose's offsets.)
@@ -648,6 +669,8 @@ const RIG = {
   eyeRelief: 0.26,
   kick: 0.4,
   tacOut: new THREE.Vector3(),
+  sprintPose: 1,
+  sprintOut: new THREE.Vector3(),
 };
 // A gun's own RIG values: its rig in GUN_KINDS over RIG's.
 function rigOf(kind) {
@@ -741,6 +764,8 @@ const triggerPullAt = (tt) => (tt < 0.03 ? tt / 0.03 : tt < 0.11 ? 1 - (tt - 0.0
 
 export class Viewmodel {
   constructor(renderer, sunDirection) {
+    this.renderer = renderer;
+    this.gloves = null; // the outfit's gloves on the guns with their own arms (see wearGloves)
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(VIEW_FOV, 1, 0.01, 3);
 
@@ -791,7 +816,7 @@ export class Viewmodel {
     // (put away mid-reload: see update and updateSwitch).
     this.rigHeld = false;
     // (What a gun with its own arms is told each frame: one object, reused.)
-    this.rigState = { clip: 'idle', time: 0, toIdle: 0, empty: false, shotDt: 0, moving: { walk: 0, run: 0 }, slide: 'clip', triggerPull: 0 };
+    this.rigState = { clip: 'idle', time: 0, toIdle: 0, empty: false, shotDt: 0, moving: { walk: 0, run: 0 }, aim: 0, slide: 'clip', triggerPull: 0 };
     this.rigFrameSeconds = 0; // real time this frame, for its shots (see animateRig)
     this.wristRight = new THREE.Vector3();
     this.wristLeft = new THREE.Vector3();
@@ -974,8 +999,9 @@ export class Viewmodel {
   // RIG), from its loaded model; or null if the model hasn't what it needs
   // (then its stand-in is used). Its points (the muzzle, the ejection port
   // and the sights) are in the space of its frame's node (the gun layer's
-  // `pistol` while it's held), which in the idle pose is gun space moved to
-  // M.frame; that's where it is, for aiming.
+  // `pistol` while it's held), which in the idle pose (or the aimed idle
+  // pose, for a gun with its own aimed clips) is gun space moved to M.frame;
+  // that's where it is, for aiming.
   rigAnimated(key, scene, animations) {
     const kind = GUN_KINDS[key];
     const M = kind.animated;
@@ -1077,10 +1103,18 @@ export class Viewmodel {
     if (g === this.current) this.aimAt(points.sights, points.sightsAt);
   }
 
+  // Has the guns with their own arms wear the gloves in `outfit` (the
+  // Outfit, src/gear.js; see gunGloves.js): each from when it's taken out.
+  wearGloves(outfit) {
+    this.gloves = new GunGloves(outfit, this);
+    if (this.current) this.gloves.dress(this.current.key);
+  }
+
   // Puts a gun in the hands (straight away; switchTo puts one away first).
   useGun(key) {
     const g = this.guns[key];
     if (!g || g === this.current) return;
+    if (this.gloves) this.gloves.dress(key);
     if (this.current) this.gun.remove(this.current.object);
     this.current = g;
     this.gun.add(g.object);
@@ -1180,6 +1214,8 @@ export class Viewmodel {
     const target = this.switching ? this.switching.to : this.shownGun;
     if (key === target) return false;
     this.switching = { to: key };
+    // (Its gloves load while the other is put away.)
+    if (this.gloves) this.gloves.dress(key);
     return true;
   }
 
@@ -1434,6 +1470,7 @@ export class Viewmodel {
 
     // Weapon physics move the whole posed gun about the pivot between the wrists.
     // Sprinting tips the gun down, except while reloading, inspecting or aiming.
+    this.motion.sprintPose = this.current && this.current.held ? this.current.held.sprintPose : 1;
     this.motion.update(frameSeconds, player, yaw, pitch, wallDistance, aim, Boolean(player.sprinting) && reload < 0 && inspect < 0 && !aiming);
     this.holder.position.copy(this.pivot).add(this.motion.position.value).add(this.reachPull);
     const r = this.motion.rotation.value;
@@ -1680,6 +1717,7 @@ export class Viewmodel {
     s.toIdle = toIdle;
     s.empty = empty;
     s.shotDt = this.rigFrameSeconds;
+    s.aim = this.lastAim || 0;
     s.slide = slide;
     s.triggerPull = this.triggerPull;
     rig.update(dt, s);
@@ -1690,7 +1728,7 @@ export class Viewmodel {
   // sprinting only if its model asks for it (see animatedGun.js).
   poseRig(sprintBend) {
     const g = this.current;
-    g.object.position.copy(g.at).addScaledVector(g.held.tacOut, this.motion.tac);
+    g.object.position.copy(g.at).addScaledVector(g.held.tacOut, this.motion.tac).addScaledVector(g.held.sprintOut, this.motion.sprint);
     if (sprintBend) g.rig.bendWrists(sprintBend);
   }
 
