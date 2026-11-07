@@ -17,6 +17,7 @@ import { MODEL_HIPISTOL } from './hipistol.js';
 import { MODEL_X4 } from './x4.js';
 import { MODEL_MP7 } from './mp7.js';
 import { MODEL_AR15 } from './ar15.js';
+import { MODEL_MAKAROV } from './makarov.js';
 import { AnimatedGun } from './animatedGun.js';
 import { GunGloves } from './gunGloves.js';
 import { createArms, rightHandPose } from './arms.js';
@@ -26,7 +27,7 @@ import { ViewmodelMotion, MOTION } from './motion.js';
 import { MuzzleFlash } from '../effects/muzzleFlash.js';
 import { outdoorEnvironment } from '../world.js';
 import { RELOAD_STEPS, CATCH_GAP, magazineFall, INSPECT, INSPECT_STEPS, reloadSteps } from '../weapon.js';
-import { PISTOL, PISTOL45, BERETTA, FN502, HIPISTOL, X4, MP7, AR15, LOADOUT } from '../shared/config.js';
+import { PISTOL, PISTOL45, BERETTA, FN502, HIPISTOL, X4, MP7, AR15, MAKAROV, LOADOUT } from '../shared/config.js';
 
 // Points on the built-in first pistol (gun space; used if its model file
 // can't be loaded; the model's are in pistol9.js): the
@@ -146,6 +147,11 @@ const GUN_KINDS = {
       suppressed: true, redDot: { radius: 0.0188 },
     },
     fallback: createPistol, fallbackPoints: POINTS9, fallbackRules: standIn(AR15),
+  },
+  makarov: {
+    rules: MAKAROV, model: new URL('../../assets/makarov.glb', import.meta.url), animated: MODEL_MAKAROV,
+    rig: { sightAsAtHip: MODEL45.sights, kick: 0.4, aimLevel: 1 },
+    fallback: createPistol, fallbackPoints: POINTS9, fallbackRules: standIn(MAKAROV),
   },
 };
 
@@ -733,6 +739,20 @@ function rigOf(kind) {
   }
   return r;
 }
+// For a gun with its own arms whose maker holds it a little turned from the
+// eye's view (its model's sights.front: the top of its front blade, where it
+// isn't on the line straight ahead from the rear sight's), the turn that
+// lines its sights up with the view ahead: aimed, the whole rig is turned by
+// it (then by its aimRoll), so the front blade sits on the rear sight.
+// (Whatever its aimLevel: the roll after it is about the line of sight it
+// gives, so it keeps the sights lined up however much of the cant is
+// levelled.) Null for the others.
+function sightLine(sights) {
+  if (!sights || !sights.front) return null;
+  const line = new THREE.Vector3(sights.front.x - (sights.x || 0), sights.front.height - sights.height, sights.frontZ - sights.rearZ).normalize();
+  return new THREE.Quaternion().setFromUnitVectors(line, new THREE.Vector3(0, 0, -1));
+}
+
 // A gun with its own arms has none of the other guns' separate parts.
 const NO_PARTS = {
   slide: null, trigger: null, barrel: null, magazine: null, magazineRest: null, slideStop: null, hammer: null,
@@ -902,6 +922,7 @@ export class Viewmodel {
     this.wristLeft = new THREE.Vector3();
     this.aimPosition = new THREE.Vector3();
     this.aimRoll = new THREE.Quaternion();
+    this.aimTurning = new THREE.Quaternion();
     // A red dot sight's dot (see showRedDot): one, for whichever gun has one.
     this.redDot = new THREE.Sprite(new THREE.SpriteMaterial({
       map: dotTexture(), transparent: true, depthWrite: false, toneMapped: false,
@@ -1120,6 +1141,10 @@ export class Viewmodel {
       // (Aimed, the rig is turned this much about the line of sight: radians,
       // positive anticlockwise as you look.)
       aimRoll: -THREE.MathUtils.degToRad((M.cant || 0) * held.aimLevel),
+      // (Aimed, the rig is turned by this first, for a gun whose sights
+      // don't line up with the eye's view in its maker's pose: see
+      // sightLine.)
+      aimTurn: sightLine(M.sights),
     };
     const g = { key, rules: kind.rules, base: points, points, pistol: rig.frame, object, rig, at, held, animated: M, parts: NO_PARTS, attachments: {}, on: {}, release: '' };
     g.flash = new MuzzleFlash(M.muzzle);
@@ -1250,14 +1275,17 @@ export class Viewmodel {
   // the sight's own eye relief). (Sights that aren't on gun space's middle
   // line, or measured from a part that isn't at its origin, `at`, are moved
   // over by that much.)
-  // (A gun whose rig is turned about the line of sight as it's aimed, its
-  // points' aimRoll, is placed so its sights are on that line, turned.)
+  // (A gun whose rig is turned as it's aimed, its points' aimTurn and
+  // aimRoll, is placed so its sights are on that line, turned.)
   aimAt(sights, at = null) {
     const x = (sights.x || 0) + (at ? at.x : 0);
     const y = sights.height + (at ? at.y : 0);
     const z = sights.rearZ + (at ? at.z : 0);
     const roll = (this.current && this.current.points.aimRoll) || 0;
-    const rear = new THREE.Vector3(x, y, z).applyAxisAngle(FORWARD_AXIS, roll);
+    const turn = this.current && this.current.points.aimTurn;
+    const rear = new THREE.Vector3(x, y, z);
+    if (turn) rear.applyQuaternion(turn);
+    rear.applyAxisAngle(FORWARD_AXIS, roll);
     this.aimPosition.set(-rear.x, -rear.y, -((sights.eyeRelief ?? AIM.eyeToRearSight) + rear.z));
   }
 
@@ -1495,7 +1523,8 @@ export class Viewmodel {
   sightOnScreen() {
     if (this.points.redDot && this.pistol && this.redDotPoint(dotAim) !== null) return dotAim.project(this.camera);
     const sights = this.points.sights;
-    return this.pointOnGun([sights.x || 0, sights.height, sights.frontZ]).project(this.camera);
+    const front = sights.front || { x: sights.x || 0, height: sights.height };
+    return this.pointOnGun([front.x, front.height, sights.frontZ]).project(this.camera);
   }
 
   // frameSeconds: time since the last frame. player: movement state.
@@ -1528,6 +1557,7 @@ export class Viewmodel {
     this.posePosition.y -= AIM.arc.down * swoop;
     this.poseQuaternion.slerpQuaternions(HIP_QUATERNION, AIM_ROTATION, aim);
     if (this.points.aimRoll) this.poseQuaternion.multiply(this.aimRoll.setFromAxisAngle(FORWARD_AXIS, this.points.aimRoll * aim));
+    if (this.points.aimTurn) this.poseQuaternion.multiply(this.aimTurning.identity().slerp(this.points.aimTurn, aim));
     this.poseQuaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), AIM.arc.roll * swoop));
     // Reloading: the gun comes up and in, tipped so the magazine well faces
     // you, so you can watch the support hand bring the new magazine in.
