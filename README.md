@@ -9,4 +9,4 @@ Play it at https://noah-and-lars.github.io/project-fish-test/
 
 Third-party models are credited in the game (the credits on the start screen).
 
-Last copied from Noah-and-Lars/projects branch claude/youthful-pascal-llzq29 at 97aa6a2 (eight guns).
+Last copied from Noah-and-Lars/projects branch claude/youthful-pascal-llzq29 at 508b269 (eight guns).
