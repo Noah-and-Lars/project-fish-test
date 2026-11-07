@@ -1,5 +1,7 @@
 // A gun that brings its own arms and animations (the Beretta 92FS, see
-// beretta.js, the FN 502, fn502.js, and the Browning Hi-Power, hipistol.js),
+// beretta.js, the FN 502, fn502.js, the Browning Hi-Power, hipistol.js,
+// the Makarov PM, makarov.js, the AK-74M, ak74m.js, the AK-74U, ak74u.js,
+// and the Franchi SPAS-12, saps12.js),
 // or whose maker's clips were put on the soldier's own arms (the Xiri X4,
 // x4.js, the MP7A1, mp7.js, and the AR-15, ar15.js; see soldierRig.js): one skeleton with the
 // arms, hands and gun on it, and the clips its maker made for it. The gun layer (viewmodel.js) puts it where
@@ -27,7 +29,11 @@
 // - dry: the trigger pulled with nothing to fire (only from the idle pose:
 //   resting with the slide locked back, there's nothing for it to show).
 // - reload (with rounds left) and reloadEmpty (from empty, slide locked back
-//   at the start). With only one, it plays for both.
+//   at the start). With only one, it plays for both. A gun with more than
+//   one reload with rounds left has the others too (the AK-74M's reload2),
+//   and the gun's state says which is playing; so does a gun loaded a shell
+//   at a time, through its reloadStart, reload (one shell, again for each),
+//   reloadEnd and pump clips (see src/weapon.js).
 // - inspect.
 // - walk, run: loops of the hands' sway as the player walks and runs (each
 //   starting and ending in the idle pose). Played in place of the idle pose
@@ -38,7 +44,11 @@
 //   (idle, walk, shoot; at the same time into it) as much as the gun layer
 //   has the gun up to the sights (the state's aim), so it blends in with
 //   the gun layer's own move up to the sights. A gun without them is aimed
-//   by the gun layer alone.
+//   by the gun layer alone; one whose idle loop moves the sights about
+//   (model.aimStill: seconds into idle) holds its idle at that frame, the
+//   one its sights were lined up in, as much as it's up to the sights;
+//   with model.aimShot too, aimed, its shot clip plays only that share
+//   over that frame (the SPAS-12's swings the gun 37 degrees up).
 //
 // The clips are sampled, not played: each frame the gun layer says which one
 // the gun is in and how far (the reload's progress, how far the switch has
@@ -99,6 +109,8 @@ const AIMED = { idle: 'aimIdle', walk: 'aimWalk', shoot: 'aimShoot' };
 // A rest clip (idle, idleEmpty, aimIdle) at most this long (seconds) is a
 // still, held at its start; a longer one loops.
 const STILL = 0.1;
+// The clips of a reload (see the reloading getter).
+const RELOADS = new Set(['reload', 'reload2', 'reloadEmpty', 'reloadStart', 'reloadEnd', 'pump']);
 
 const ACROSS = new THREE.Vector3(1, 0, 0);
 const turn = new THREE.Quaternion();
@@ -175,6 +187,12 @@ export class AnimatedGun {
       this.actions[key] = action(clip);
       this.ghosts[key] = action(copy(clip, '_fading'));
     }
+    // (aimStill) The idle clip held at one frame while aiming: one more
+    // action for it (and its fading copy).
+    if (model.aimStill !== undefined && clips.idle) {
+      this.actions.idleHeld = action(copy(clips.idle, '_held'));
+      this.ghosts.idleHeld = action(copy(clips.idle, '_heldFading'));
+    }
     // (All of them, to zero each frame.)
     this.allActions = [...Object.values(this.actions), ...Object.values(this.ghosts)];
     // (additiveShots) A few actions adding the shoot clip on top, one for
@@ -243,7 +261,7 @@ export class AnimatedGun {
 
   // Whether it's in (or holding the pose of) a reload.
   get reloading() {
-    return Boolean(this.lowering) || this.base.clip === 'reload' || this.base.clip === 'reloadEmpty';
+    return Boolean(this.lowering) || RELOADS.has(this.base.clip);
   }
 
   // Remembers where the clips put a bone, before it's changed on top of them.
@@ -437,7 +455,40 @@ export class AnimatedGun {
     }
     this.putBack();
     this.mixer.update(0);
+    if (this.ghost) this.unfaded(clip);
     this.setParts(dt, clip, slide, triggerPull);
+  }
+
+  // (model.noFade) While one clip fades into another, the bones named there
+  // are where the clip now playing has them, not on the way between the two:
+  // the SPAS-12's shell, which each reload clip has in the hand while the one
+  // before ends with it hidden in the gun, would otherwise float from the
+  // gun to the hand, in view, with no hand on it.
+  unfaded(clip) {
+    if (!this.noFade) {
+      this.noFade = (this.model.noFade || []).map((name) => this.root.getObjectByName(name)).filter(Boolean);
+      this.noFadeTracks = new Map();
+    }
+    if (!this.noFade.length) return;
+    const action = this.actions[clip];
+    if (!action || action.weight <= 0) return;
+    let tracks = this.noFadeTracks.get(clip);
+    if (!tracks) {
+      tracks = [];
+      for (const bone of this.noFade) {
+        for (const track of this.clips[clip].tracks) {
+          const [node, property] = track.name.split('.');
+          if (node === bone.name && (property === 'position' || property === 'quaternion' || property === 'scale')) {
+            tracks.push({ bone, property, at: track.createInterpolant() });
+          }
+        }
+      }
+      this.noFadeTracks.set(clip, tracks);
+    }
+    for (const { bone, property, at } of tracks) {
+      this.keep(bone);
+      bone[property].fromArray(at.evaluate(action.time));
+    }
   }
 
   // The rest pose `key` from the action set `actions` (the playing ones or
@@ -448,7 +499,10 @@ export class AnimatedGun {
     const left = key === 'idle' ? this.loopsUnder(actions, w, moving, this.loops) : w;
     const length = this.duration(key);
     const still = this.stillAt(key);
-    this.play(actions, key, still !== null ? still : length > STILL ? this.loopTime % length : 0, Math.max(0, left));
+    // (aimStill: held at one frame as much as it's up to the sights.)
+    const held = key === 'idle' && actions.idleHeld ? this.aim : 0;
+    if (held < 1) this.play(actions, key, still !== null ? still : length > STILL ? this.loopTime % length : 0, Math.max(0, left) * (1 - held));
+    if (held > 0) setAction(actions.idleHeld, this.model.aimStill, Math.max(0, left) * held);
   }
 
   // The loops `keys` (those it has) from `actions`, as much of weight `w` as
@@ -477,6 +531,15 @@ export class AnimatedGun {
   // Clip `key` from `actions` at `time`, weighted `w`: with as much of that
   // in its aimed variant, if it has one, as the gun is up to the sights.
   play(actions, key, time, w) {
+    // (aimShot: aimed, its shot clip plays only that share of its weight,
+    // the rest held in the idle frame its sights were lined up in, aimStill:
+    // a shot clip that swings the gun far up at the hip, as the SPAS-12's,
+    // would throw the sights right out of view.)
+    if (key === 'shoot' && this.model.aimShot !== undefined && actions.idleHeld) {
+      const keep = this.aim * (1 - this.model.aimShot);
+      if (keep > 0) setAction(actions.idleHeld, this.model.aimStill, w * keep);
+      w *= 1 - keep;
+    }
     const aimed = AIMED[key];
     const share = aimed && actions[aimed] ? this.aim : 0;
     if (share < 1) setAction(actions[key], time, w * (1 - share));

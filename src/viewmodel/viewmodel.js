@@ -18,6 +18,9 @@ import { MODEL_X4 } from './x4.js';
 import { MODEL_MP7 } from './mp7.js';
 import { MODEL_AR15 } from './ar15.js';
 import { MODEL_MAKAROV } from './makarov.js';
+import { MODEL_AK74M } from './ak74m.js';
+import { MODEL_AK74U } from './ak74u.js';
+import { MODEL_SAPS12 } from './saps12.js';
 import { AnimatedGun } from './animatedGun.js';
 import { GunGloves } from './gunGloves.js';
 import { createArms, rightHandPose } from './arms.js';
@@ -27,7 +30,7 @@ import { ViewmodelMotion, MOTION } from './motion.js';
 import { MuzzleFlash } from '../effects/muzzleFlash.js';
 import { outdoorEnvironment } from '../world.js';
 import { RELOAD_STEPS, CATCH_GAP, magazineFall, INSPECT, INSPECT_STEPS, reloadSteps } from '../weapon.js';
-import { PISTOL, PISTOL45, BERETTA, FN502, HIPISTOL, X4, MP7, AR15, MAKAROV, LOADOUT } from '../shared/config.js';
+import { PISTOL, PISTOL45, BERETTA, FN502, HIPISTOL, X4, MP7, AR15, MAKAROV, AK74M, AK74U, SAPS12, LOADOUT } from '../shared/config.js';
 
 // Points on the built-in first pistol (gun space; used if its model file
 // can't be loaded; the model's are in pistol9.js): the
@@ -62,12 +65,16 @@ const BLADE_TRAVEL = 0.0009;
 
 // If the model of a gun with its own arms can't be loaded, the PF-9's built-
 // in stand-in takes its place, held by the usual hands: its rules, but the
-// PF-9's reloads and inspect (theirs follow their own animations).
+// PF-9's reloads and inspect (theirs follow their own animations; a
+// shotgun's stand-in is reloaded by the magazine too).
 const standIn = (rules) => ({
   ...rules,
   reloadTime: PISTOL.reloadTime,
   emptyReloadTime: PISTOL.emptyReloadTime,
   reloadSteps: undefined,
+  reloadTurns: undefined,
+  reload: undefined,
+  shells: undefined,
   inspectTime: undefined,
   inspectLocked: undefined,
   inspect: undefined,
@@ -152,6 +159,45 @@ const GUN_KINDS = {
     rules: MAKAROV, model: new URL('../../assets/makarov.glb', import.meta.url), animated: MODEL_MAKAROV,
     rig: { sightAsAtHip: MODEL45.sights, kick: 0.4, aimLevel: 1 },
     fallback: createPistol, fallbackPoints: POINTS9, fallbackRules: standIn(MAKAROV),
+  },
+  // (Its maker framed it shouldered, low on the right; it's held 5 cm
+  // further right, 1.5 cm lower and 2 cm further out, which shows the
+  // rifle from the rear sight forward with the support hand on the
+  // handguard. Aiming, its rear sight is 27 cm from the eye, about where its
+  // maker had it: any further out and the support arm's cut-off upper arm
+  // comes up into the bottom left of the view. Its run clip is its maker's
+  // sprint carry, the rifle held upright on the right with the support arm
+  // swinging free, so it doesn't take the gun layer's sprint pose; that's
+  // held 6 cm further right and 5 cm lower, so the rifle stays at the edge
+  // of the view instead of across it.)
+  ak74m: {
+    rules: AK74M, model: new URL('../../assets/ak74m.glb', import.meta.url), animated: MODEL_AK74M,
+    rig: { hip: new THREE.Vector3(0.05, -0.015, -0.02), kick: 0.3, aimLevel: 1, eyeRelief: 0.27, sprintPose: 0, sprintOut: new THREE.Vector3(0.06, -0.05, 0), runBlend: [0.3, 0.85] },
+    fallback: createPistol, fallbackPoints: POINTS9, fallbackRules: standIn(AK74M),
+  },
+  // (Its download has no camera: the converter's eye is where the head
+  // would be. It's held 3 cm further right, 2 cm lower and 3 cm further
+  // out than that, the carbine on the right with both hands in view and the
+  // hoodie's cut-off sleeves out of view through every clip. Aiming, its
+  // rear sight is 28 cm from the eye. No walk or run clips: it takes the
+  // gun layer's bob and sprint pose, as the PF-9 does.)
+  ak74u: {
+    rules: AK74U, model: new URL('../../assets/ak74u.glb', import.meta.url), animated: MODEL_AK74U,
+    rig: { hip: new THREE.Vector3(0.03, -0.02, -0.03), kick: 0.3, aimLevel: 1, eyeRelief: 0.28 },
+    fallback: createPistol, fallbackPoints: POINTS9, fallbackRules: standIn(AK74U),
+  },
+  // (Its maker framed it low on the right, the folded stock's top and the
+  // receiver filling the bottom of the view; it's held 7 cm higher and 1 cm
+  // to the left, which shows the receiver, the heat shield and the support
+  // hand on the fore-end. Aiming, its rear sight is 42 cm from the eye, the
+  // folded stock's arms either side of the sights: any closer and the back
+  // of the receiver fills the bottom of the view. Its run clip is its maker's sprint carry, the gun swung low across
+  // the body, so it doesn't take the gun layer's sprint pose; that's held
+  // 1.5 cm higher, enough to keep the gun in view along the bottom.)
+  saps12: {
+    rules: SAPS12, model: new URL('../../assets/saps12.glb', import.meta.url), animated: MODEL_SAPS12,
+    rig: { hip: new THREE.Vector3(-0.01, 0.07, 0), kick: 0.3, eyeRelief: 0.42, sprintPose: 0, sprintOut: new THREE.Vector3(0, 0.015, 0) },
+    fallback: createPistol, fallbackPoints: POINTS9, fallbackRules: standIn(SAPS12),
   },
 };
 
@@ -703,6 +749,11 @@ const HIP_QUATERNION = new THREE.Quaternion().setFromEuler(HIP_ROTATION);
 //   maker's own sprint pose. sprintOut: sprinting, it's held this much
 //   higher (metres, gun space), as much as it's in the sprint pose: for a
 //   run clip that takes the gun lower than the gun layer's view shows.
+//   runBlend: [from, to], for a run clip with the support hand off the gun
+//   (the AK-74M's): its run loop is played in place of the walk loop over
+//   just that stretch of the way into the sprint pose (0..1), so coming out
+//   of a sprint the hand is back on the gun in a moment (about 0.15 s)
+//   rather than drifting beside it for as long as the pose takes.
 // - aimLevel: how much of the cant its maker holds it at (its model's cant)
 //   the whole rig is turned back about the line of sight as it comes up to
 //   the sights (1: aimed level).
@@ -724,6 +775,7 @@ const RIG = {
   tacOut: new THREE.Vector3(),
   sprintPose: 1,
   sprintOut: new THREE.Vector3(),
+  runBlend: null,
   aimLevel: 0,
   suppressed: false,
   redDot: null,
@@ -1146,6 +1198,14 @@ export class Viewmodel {
       // sightLine.)
       aimTurn: sightLine(M.sights),
     };
+    if (M.hold) {
+      // (A gun whose `gun` node turns with it, held turned M.hold at rest:
+      // aimed, it's turned back by that as well, and its rear sight is
+      // where that turn has it.)
+      const hold = new THREE.Quaternion(...M.hold).normalize();
+      points.aimTurn = (points.aimTurn || new THREE.Quaternion()).clone().multiply(hold.clone().invert());
+      points.aimRear = new THREE.Vector3(M.sights.x || 0, M.sights.height, M.sights.rearZ).applyQuaternion(hold).add(points.sightsAt);
+    }
     const g = { key, rules: kind.rules, base: points, points, pistol: rig.frame, object, rig, at, held, animated: M, parts: NO_PARTS, attachments: {}, on: {}, release: '' };
     g.flash = new MuzzleFlash(M.muzzle);
     g.flash.setMuzzle(M.muzzle, held.suppressed);
@@ -1283,7 +1343,8 @@ export class Viewmodel {
     const z = sights.rearZ + (at ? at.z : 0);
     const roll = (this.current && this.current.points.aimRoll) || 0;
     const turn = this.current && this.current.points.aimTurn;
-    const rear = new THREE.Vector3(x, y, z);
+    const own = this.current && this.current.points.aimRear;
+    const rear = own ? own.clone() : new THREE.Vector3(x, y, z);
     if (turn) rear.applyQuaternion(turn);
     rear.applyAxisAngle(FORWARD_AXIS, roll);
     this.aimPosition.set(-rear.x, -rear.y, -((sights.eyeRelief ?? AIM.eyeToRearSight) + rear.z));
@@ -1830,7 +1891,9 @@ export class Viewmodel {
       clip = 'draw';
       time = (1 - this.lowered) * rig.duration('draw');
     } else if (reload >= 0) {
-      clip = gun.reloadEmpty ? 'reloadEmpty' : 'reload';
+      // (The gun's own reload clip, for one with more than one with rounds
+      // left or loaded a shell at a time: reloadClip.)
+      clip = gun.reloadClip || (gun.reloadEmpty ? 'reloadEmpty' : 'reload');
       time = reload * rig.duration(rig.clipFor(clip));
     } else if (gun && gun.inspectTime >= 0) {
       clip = 'inspect';
@@ -1846,8 +1909,10 @@ export class Viewmodel {
     // (Aiming, they're kept down as much as the gun layer's bob is.)
     const k = this.motion.bobAmount * (1 - (1 - MOTION.aiming.bob) * (this.lastAim || 0));
     const s = this.rigState;
-    s.moving.walk = k * (1 - this.motion.sprint);
-    s.moving.run = k * this.motion.sprint;
+    const blend = this.current && this.current.held && this.current.held.runBlend;
+    const run = blend ? smoothstep(blend[0], blend[1], this.motion.sprint) : this.motion.sprint;
+    s.moving.walk = k * (1 - run);
+    s.moving.run = k * run;
     s.clip = clip;
     s.time = time;
     s.toIdle = toIdle;
