@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+// Phones and tablets get their own layout (html.mob, see the end of arcade.css), as on the real site.
+(function () {
+  var u = navigator.userAgent || '', c = document.documentElement.classList, f = '';
+  try { f = (/[?&]mob=(phone|tab|off)/.exec(location.search) || [])[1] || sessionStorage.getItem('arcade-mob') || ''; if (f) sessionStorage.setItem('arcade-mob', f); } catch (e) {}
+  var ipad = /iPad/.test(u) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var phone = /iPhone|iPod|Windows Phone|BlackBerry|webOS|Android.+Mobile|Mobile.+Firefox/.test(u);
+  var tab = !phone && (ipad || /Android|Tablet|Silk|Kindle|PlayBook/.test(u));
+  if (f) { phone = f === 'phone'; tab = f === 'tab'; }
+  if (phone || tab) { c.add('mob'); c.add(phone ? 'mob-phone' : 'mob-tab'); }
+  var vh = function () { document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px'); };
+  vh(); window.addEventListener('resize', vh);
+  if (window.Element && !Element.prototype.replaceChildren) Element.prototype.replaceChildren = function () { while (this.firstChild) this.removeChild(this.firstChild); for (var i = 0; i < arguments.length; i++) { var n = arguments[i]; this.appendChild(typeof n === 'string' ? document.createTextNode(n) : n); } };
+})();
+</script>
+<title>The Arcade · test site</title>
+<meta name="description" content="Test site: a preview of Project Fish on The Arcade.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0a0916">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="icon" href="icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="arcade.css?v=14">
+</head>
+<body class="player">
+<header class="top">
+  <a class="back" href="index.html" aria-label="Back to all games">← All games</a>
+  <div class="ptitle-wrap">
+    <h1 id="title" class="ptitle"></h1>
+  </div>
+  <div class="actions">
+    <a id="next" class="btn ghost">Next game →</a>
+    <button id="fs" class="btn">Fullscreen</button>
+  </div>
+</header>
+
+<main class="stage-wrap">
+  <div id="stage" class="stage">
+    <iframe id="frame" title="Game" allowfullscreen allow="microphone; gamepad; fullscreen"></iframe>
+    <div id="loading" class="loading">
+      <img id="loadArt" alt="">
+      <div class="loading-box">
+        <p id="loadText">Loading…</p>
+        <div class="loading-bar"><i></i></div>
+      </div>
+    </div>
+  </div>
+  <script src="intro.js?v=3"></script>
+
+  <section class="howto">
+    <h2 class="sec-h">How to play</h2>
+    <ul id="keys" class="keys"></ul>
+    <p class="hint">Click the game if the keys don't respond. <a id="newtab" target="_blank" rel="noopener">Open in its own tab</a></p>
+    <p class="hint">Test site: preview of Project Fish on The Arcade. The other games open on the <a href="https://noah-and-lars.github.io/projects/">real arcade</a>.</p>
+  </section>
+
+  <h2 class="sec-h more-h">More games</h2>
+  <section id="more" class="grid small"></section>
+</main>
+
+<script src="games.js?v=1"></script>
+<script>
+// The real play page's code, minus accounts, cloud saves and the live counts. Only games on this site
+// (Project Fish) play here; any other id goes to the real site's page for it.
+const $ = id => document.getElementById(id);
+const id = new URLSearchParams(location.search).get('game');
+const index = GAMES.findIndex(g => g.id === id);
+const game = GAMES[index];
+
+if (!game) {
+  location.replace('index.html');
+} else if (game.href) {
+  location.replace(game.href);
+} else {
+  Arcade.markPlayed(game.id);
+  document.title = game.title + ' · The Arcade';
+  $('title').textContent = game.title;
+
+  // Loading screen until the game is ready, then hand it the keyboard
+  const frame = $('frame');
+  $('loadArt').src = game.thumb;
+  $('loadText').textContent = 'Loading ' + game.title + '…';
+  frame.addEventListener('load', () => {
+    $('loading').classList.add('done');
+    try { frame.contentWindow.focus(); } catch (e) {}
+    if (window.ArcadeIntro) ArcadeIntro.done.then(() => { try { frame.contentWindow.focus(); } catch (e) {} });
+  });
+  // the game starts loading as the "Made by The Arcade" intro fades out (intro.js)
+  (window.ArcadeIntro ? ArcadeIntro.load : Promise.resolve()).then(() => { if (!frame.src) frame.src = game.path; });
+  $('newtab').href = game.path;
+
+  const next = GAMES[(index + 1) % GAMES.length];
+  $('next').href = playUrl(next);
+  $('next').title = 'Play ' + next.title;
+
+  for (const [k, what] of game.keys || []) {
+    const li = document.createElement('li');
+    li.innerHTML = '<span class="kbds"></span><span></span>';
+    for (const part of k.split(' / ')) {
+      const kbd = document.createElement('kbd');
+      kbd.textContent = part;
+      li.firstChild.append(kbd);
+    }
+    li.lastChild.textContent = what;
+    $('keys').appendChild(li);
+  }
+
+  const stage = $('stage');
+  $('fs').onclick = () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage);
+  };
+
+  for (const g of GAMES.filter(g => g.id !== id)) {
+    const a = document.createElement('a');
+    a.className = 'tile';
+    a.href = playUrl(g);
+    a.innerHTML = '<div class="thumb"><img alt="" loading="lazy"></div><div class="info"><h2></h2><p class="desc"></p></div>';
+    a.querySelector('img').src = g.thumb;
+    a.querySelector('h2').textContent = g.title;
+    a.querySelector('.desc').textContent = g.tagline;
+    $('more').appendChild(a);
+  }
+}
+</script>
+</body>
+</html>

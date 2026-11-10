@@ -1,0 +1,160 @@
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: #fff;
+  user-select: none;
+}
+
+#game canvas {
+  display: block;
+}
+
+/* Small dot in the middle of the screen. */
+#crosshair {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+
+body:not(.playing) #crosshair {
+  display: none;
+}
+
+/* Aiming down the sights: the sights take over from the dot. */
+#crosshair {
+  transition: opacity 0.12s;
+}
+
+body.aiming #crosshair,
+body.sprinting #crosshair {
+  opacity: 0;
+}
+
+/* Ammo counter, bottom right: rounds in the magazine, then the reserve. */
+#ammo {
+  position: fixed;
+  right: 28px;
+  bottom: 22px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font: 600 16px/1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
+/* The gun's name, small, before the count. */
+#ammo .name {
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  opacity: 0.7;
+}
+
+#ammo .mag {
+  font-size: 40px;
+  font-variant-numeric: tabular-nums;
+}
+
+#ammo .reserve {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+#ammo .reserve::before {
+  content: '/ ';
+}
+
+#ammo .hint {
+  position: absolute;
+  right: 0;
+  bottom: 52px;
+  white-space: nowrap;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+#ammo.low .mag {
+  color: #ff8f7a;
+}
+
+body:not(.playing) #ammo {
+  display: none;
+}
+
+#debug {
+  position: fixed;
+  left: 12px;
+  top: 12px;
+  margin: 0;
+  padding: 6px 10px;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  pointer-events: none;
+  white-space: pre;
+}
+
+#debug:empty {
+  display: none;
+}
+
+/* The loadout menu (B) is styled in src/loadout.css. */
+
+body.menu-open #crosshair,
+body.menu-open #ammo {
+  display: none;
+}
+
+
+/* Photo mode (P): no crosshair or ammo; a note on the controls. */
+body.photo #crosshair,
+body.photo #ammo {
+  display: none;
+}
+
+#photo-hint {
+  display: none;
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: rgba(20, 22, 26, 0.7);
+  color: #fff;
+  font: 13px/1.4 system-ui, sans-serif;
+  text-align: center;
+}
+
+body.photo #photo-hint {
+  display: block;
+}
+
+/* A breakdown loading (src/main.js): the same dark screen its own overlay
+   has, till its code is in; Esc goes back to the picker. */
+.showcase-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse 80% 70% at 50% 45%, #2e343b 0%, #181b1f 58%, #0b0c0e 100%);
+  color: #8f99a2;
+  font: 14px system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
