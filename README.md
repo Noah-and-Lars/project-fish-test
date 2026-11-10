@@ -1,16 +1,16 @@
-# Project Fish (test site)
+# Steelhead: Dead Ground (test site)
 
-A test copy of Project Fish, published here so it can be seen and played before it goes live on The Arcade
+A test copy of Steelhead: Dead Ground, published here so it can be seen and played before it goes live on The Arcade
 (https://noah-and-lars.github.io/projects/).
 
 Open it at https://noah-and-lars.github.io/project-fish-test/
 
 - **The home page** (`index.html`, with `arcade.css`, `games.js`, the logo and icons) looks like The Arcade's home page,
-  so you can see Project Fish's cover among the other games: the featured banner, the game grid with search and
+  so you can see Steelhead: Dead Ground's cover among the other games: the featured banner, the game grid with search and
   category filters, the NEW and UPDATED badges and "What's new". The other games' covers load from the real arcade,
   and their tiles open them there. Nothing on this site connects to the arcade's server: no accounts, no chat, no
   live player counts (the Global chat, Players and Sign in links go to the real arcade).
-- **The play page** (`play.html?game=project-fish`, with `intro.js`) plays Project Fish in a frame the way the real
+- **The play page** (`play.html?game=project-fish`, with `intro.js`) plays Steelhead: Dead Ground in a frame the way the real
   arcade's play page does, with the keys under it.
 - **The game** is in `project-fish/` (its `index.html`, `style.css`, `src/`, `assets/` and `package.json`). It can also
   be opened on its own at https://noah-and-lars.github.io/project-fish-test/project-fish/

@@ -19,7 +19,7 @@
 })();
 </script>
 <title>The Arcade · test site</title>
-<meta name="description" content="Test site: a preview of Project Fish on The Arcade.">
+<meta name="description" content="Test site: a preview of Steelhead: Dead Ground on The Arcade.">
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#0a0916">
 <link rel="icon" href="logo.svg" type="image/svg+xml">
@@ -57,7 +57,7 @@
     <h2 class="sec-h">How to play</h2>
     <ul id="keys" class="keys"></ul>
     <p class="hint">Click the game if the keys don't respond. <a id="newtab" target="_blank" rel="noopener">Open in its own tab</a></p>
-    <p class="hint">Test site: preview of Project Fish on The Arcade. The other games open on the <a href="https://noah-and-lars.github.io/projects/">real arcade</a>.</p>
+    <p class="hint">Test site: preview of Steelhead: Dead Ground on The Arcade. The other games open on the <a href="https://noah-and-lars.github.io/projects/">real arcade</a>.</p>
   </section>
 
   <h2 class="sec-h more-h">More games</h2>
@@ -67,7 +67,7 @@
 <script src="games.js?v=1"></script>
 <script>
 // The real play page's code, minus accounts, cloud saves and the live counts. Only games on this site
-// (Project Fish) play here; any other id goes to the real site's page for it.
+// (Steelhead: Dead Ground) play here; any other id goes to the real site's page for it.
 const $ = id => document.getElementById(id);
 const id = new URLSearchParams(location.search).get('game');
 const index = GAMES.findIndex(g => g.id === id);

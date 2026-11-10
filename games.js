@@ -1,4 +1,4 @@
-// The test site's list of games: Project Fish (in project-fish/ here) among every game on the real arcade.
+// The test site's list of games: Steelhead: Dead Ground (in project-fish/ here) among every game on the real arcade.
 // The other games are copied from the live games.js (title, category, tagline, badges); their covers load from
 // the real site and their tiles open the real site's play page for them (href). Nothing here needs a server:
 // no accounts, no live counters, no stat() functions.
@@ -19,7 +19,7 @@ function readSave(key, json) {
 window.GAMES = [
   {
     id: "project-fish",
-    title: "Project Fish",
+    title: "Steelhead: Dead Ground",
     category: "Shooter",
     tagline: "An early look at a first-person shooter: twelve real guns, your own loadout and outfit, and guns taken apart part by part.",
     description: "Phase 1 of a multiplayer first-person shooter. Sprint, slide, climb and dive round a test range with twelve guns, from pistols to the AK-74M and the SPAS-12, change your outfit and attachments, and watch guns taken apart.",
@@ -301,7 +301,7 @@ window.GAMES = [
 
 // What's new on the home page, newest first
 window.NEWS = [
-  {"date":"2026-11-09","game":"project-fish","text":"New game: Project Fish. An early look at a first-person shooter with twelve guns, a loadout and gun breakdowns."},
+  {"date":"2026-11-09","game":"project-fish","text":"New game: Steelhead: Dead Ground. An early look at a first-person shooter with twelve guns, a loadout and gun breakdowns."},
   {"date":"2026-11-10","game":"turn-turn-turn","text":"Turn! Turn! TURN! 1.2.1: fixed versus calls showing \"undefined\" on the driver's screen instead of the navigator's call."},
   {"date":"2026-11-09","game":"turn-turn-turn","text":"Turn! Turn! TURN! 1.2: quick match finds you a crew partner or a whole race, and the new versus mode puts 4 to 6 players in crews of two on the same stage at once (just for fun, not on the leaderboard). Versus drivers can wind the window down and show the car behind what they think of it."},
   {"date":"2026-11-09","game":"turn-turn-turn","text":"Turn! Turn! TURN! 1.1.1: fixed the main menu popping up over a running stage for the player who joined the crew, plus a few smaller crew fixes."},
@@ -314,7 +314,7 @@ window.NEWS = [
 
 // What this browser has played, for "Continue playing" and the NEW / UPDATED badges, worked out as the real
 // site does. This site shares its browser storage with the real arcade (same address), so it reads the real
-// site's list ('arcade-played') but only ever writes its own ('arcade-test-played'), for Project Fish.
+// site's list ('arcade-played') but only ever writes its own ('arcade-test-played'), for Steelhead: Dead Ground.
 window.Arcade = {
   played() { return Object.assign({}, readSave('arcade-played', true) || {}, readSave('arcade-test-played', true) || {}); },
   markPlayed(id) {
@@ -336,5 +336,5 @@ window.Arcade = {
   stat() { return null; },
 };
 
-// Where a game's tile goes: the real site's play page, or this site's for Project Fish
+// Where a game's tile goes: the real site's play page, or this site's for Steelhead: Dead Ground
 window.playUrl = g => g.href || 'play.html?game=' + encodeURIComponent(g.id);
